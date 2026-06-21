@@ -19,12 +19,19 @@ at 85% quality.
 
 ## Usage
 
+There are two modes:
+- **Crop + convert** — crops to a centered 1:1 square, then saves as WebP.
+- **Convert only** — skips cropping entirely, just re-saves as WebP at the
+  given quality (keeps the original aspect ratio).
+
 ### Option A: drag and drop
-Drag the folder containing your photos onto `process_photos.bat`.
+- Crop + convert: drag the folder containing your photos onto `process_photos.bat`.
+- Convert only (no crop): drag the folder onto `convert_only.bat`.
 
 ### Option B: command line
 ```
-py jewelry_crop.py "C:\Users\you\Pictures\NewArrivals"
+py jewelry_crop.py "C:\Users\you\Pictures\NewArrivals"             REM crop + convert
+py jewelry_crop.py "C:\Users\you\Pictures\NewArrivals" --no-crop   REM convert only, no crop
 ```
 
 This creates `C:\Users\you\Pictures\NewArrivals\processed\` containing one
@@ -36,6 +43,7 @@ py jewelry_crop.py "C:\path\to\photos" --quality 90        # change compression 
 py jewelry_crop.py "C:\path\to\photos" --recursive         # also process photos in subfolders
 py jewelry_crop.py "C:\path\to\photos" --debug              # also save a copy showing the detected crop box, so you can sanity-check it
 py jewelry_crop.py "C:\path\to\photos" --threshold 20      # lower this if a faint/light item isn't being detected
+py jewelry_crop.py "C:\path\to\photos" --no-crop            # skip cropping, just convert/compress to WebP as-is
 ```
 
 Already-processed files are skipped on rerun, so it's safe to drop new

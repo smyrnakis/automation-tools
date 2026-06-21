@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
 Batch-crops jewelry product photos to a centered 1:1 square and saves them
-as compressed WebP images.
+as compressed WebP images. Cropping can be disabled with --no-crop to just
+convert/compress to WebP as-is.
 
 Usage:
     python jewelry_crop.py "C:\\path\\to\\photos"
     python jewelry_crop.py "C:\\path\\to\\photos" --quality 90 --recursive
     python jewelry_crop.py "C:\\path\\to\\photos" --debug
+    python jewelry_crop.py "C:\\path\\to\\photos" --no-crop
 
 Originals are never modified or deleted. Output goes into a "processed"
 subfolder created inside the input directory.
@@ -99,10 +101,16 @@ def process_image(
     threshold: float,
     padding_ratio: float,
     debug: bool,
+    crop: bool,
 ) -> str:
     """Process a single image. Returns a short status string."""
     with Image.open(src_path) as img:
         img = img.convert("RGB")
+
+        if not crop:
+            img.save(dst_path, "WEBP", quality=quality)
+            return "ok"
+
         rgb = np.array(img)
 
         bbox = find_item_bbox(rgb, threshold)
@@ -170,6 +178,11 @@ def main():
         help="Also save a copy with the detected item box (green) and crop box (red) drawn, "
         "so you can sanity-check detection before trusting it on the full batch",
     )
+    parser.add_argument(
+        "--no-crop",
+        action="store_true",
+        help="Skip item detection and cropping entirely; just convert/compress to WebP as-is",
+    )
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir).expanduser().resolve()
@@ -209,6 +222,7 @@ def main():
                 args.threshold,
                 args.padding,
                 args.debug,
+                crop=not args.no_crop,
             )
         except Exception as exc:  # noqa: BLE001 - report and keep going on batch jobs
             print(f"[error] {rel_path}: {exc}")
