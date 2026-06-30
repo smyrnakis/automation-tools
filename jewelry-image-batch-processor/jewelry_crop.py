@@ -158,13 +158,21 @@ def _item_crop_box(bbox, other_bbox, img_w, img_h):
     )
 
 
-def build_pair_canvas(img, bg_color, left_comp, right_comp, gap_ratio, vertical_offset_ratio, padding_ratio):
+def build_pair_canvas(img, bg_color, left_comp, right_comp, gap_ratio, vertical_offset_ratio):
     """Build a new square canvas with the left/right items spread apart and
-    centered as a whole, without resizing either item.
+    centered as a whole, translating each item only - never resizing it, and
+    never zooming in past the scale of the original photo.
+
+    The output square matches min(img_w, img_h) - the same "no zoom" square
+    a plain center crop of the original photo would use - so the items end
+    up at the exact same scale relative to the frame as in the source photo,
+    just moved.
 
     Returns (canvas, [left_final_box, right_final_box]) for optional debug drawing.
     """
     img_w, img_h = img.size
+    base_side = min(img_w, img_h)
+
     left_crop_box = _item_crop_box(left_comp["bbox"], right_comp["bbox"], img_w, img_h)
     right_crop_box = _item_crop_box(right_comp["bbox"], left_comp["bbox"], img_w, img_h)
 
@@ -173,21 +181,53 @@ def build_pair_canvas(img, bg_color, left_comp, right_comp, gap_ratio, vertical_
     lw, lh = left_img.size
     rw, rh = right_img.size
 
-    gap = max(1, int(round(((lw + rw) / 2) * gap_ratio)))
+    gap = int(round(((lw + rw) / 2) * gap_ratio))
+    gap = max(0, min(gap, base_side - lw - rw))
+
     vertical_offset = int(round(((lh + rh) / 2) * vertical_offset_ratio))
+    vertical_offset = max(0, min(vertical_offset, base_side - max(lh, rh)))
 
     # Right piece sits `vertical_offset` px higher than the left piece.
-    left_top = vertical_offset
-    right_top = 0
-    left_pos = (0, left_top)
-    right_pos = (lw + gap, right_top)
+    left_pos = (0, vertical_offset)
+    right_pos = (lw + gap, 0)
 
     union_w = max(left_pos[0] + lw, right_pos[0] + rw)
     union_h = max(left_pos[1] + lh, right_pos[1] + rh)
 
-    side = int(round(max(union_w, union_h) * (1 + padding_ratio)))
+    # In the (rare) case the items genuinely can't fit side by side within
+    # the original photo's own scale, grow the canvas just enough to avoid
+    # clipping rather than silently cropping a piece off.
+    side = max(base_side, union_w, union_h)
     bg_rgb = tuple(int(round(c)) for c in bg_color)
-    canvas = Image.new("RGB", (side, side), bg_rgb)
+
+    crop_left = (img_w - base_side) // 2
+    crop_top = (img_h - base_side) // 2
+
+    if side == base_side:
+        canvas = img.crop((crop_left, crop_top, crop_left + base_side, crop_top + base_side)).copy()
+    else:
+        canvas = Image.new("RGB", (side, side), bg_rgb)
+        base_square = img.crop((crop_left, crop_top, crop_left + base_side, crop_top + base_side))
+        paste_xy = ((side - base_side) // 2, (side - base_side) // 2)
+        canvas.paste(base_square, paste_xy)
+        crop_left -= paste_xy[0]
+        crop_top -= paste_xy[1]
+
+    # Erase the items from their original spots before pasting them back at
+    # their new spread-out positions, so we don't end up with duplicates.
+    erase_margin = max(4, int(round(0.005 * max(img_w, img_h))))
+    draw = ImageDraw.Draw(canvas)
+    for comp in (left_comp, right_comp):
+        ox0, oy0, ox1, oy1 = comp["bbox"]
+        draw.rectangle(
+            [
+                ox0 - crop_left - erase_margin,
+                oy0 - crop_top - erase_margin,
+                ox1 - crop_left + erase_margin,
+                oy1 - crop_top + erase_margin,
+            ],
+            fill=bg_rgb,
+        )
 
     offset_x = (side - union_w) // 2
     offset_y = (side - union_h) // 2
@@ -236,7 +276,7 @@ def process_image(
         if pair is not None:
             left_comp, right_comp = order_left_right(*pair)
             canvas, debug_boxes = build_pair_canvas(
-                img, bg_color, left_comp, right_comp, pair_gap_ratio, pair_vertical_offset_ratio, padding_ratio
+                img, bg_color, left_comp, right_comp, pair_gap_ratio, pair_vertical_offset_ratio
             )
             canvas.save(dst_path, "WEBP", quality=quality)
 

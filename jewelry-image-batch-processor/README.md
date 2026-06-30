@@ -61,19 +61,23 @@ product shots) and finds connected blobs that differ from that background.
 - **Two similarly-sized items detected** (e.g. a pair of earrings):
   automatically switches to a **pair layout** — it cuts out each piece
   (without resizing either one), spaces them apart, places the right piece
-  higher than the left, and centers the pair as a whole in the square frame.
-  Tune this with `--pair-gap` (space between pieces, default 0.6x their
-  average width) and `--pair-vertical-offset` (how much higher the right
-  piece sits, default 0.15x their average height). Use `--pair-mode off` to
-  disable this and always use a single box around everything detected, or
-  `--pair-mode on` to force the pair layout whenever 2+ items are found.
+  higher than the left, and centers the pair as a whole. The output square
+  is sized to match the original photo's own scale (`min(width, height)`),
+  so the pieces only move within the frame — they're never zoomed in or
+  enlarged relative to the canvas. (`--padding` has no effect in this mode,
+  since there's no tight crop to pad.) Tune the layout with `--pair-gap`
+  (space between pieces, default 0.6x their average width) and
+  `--pair-vertical-offset` (how much higher the right piece sits, default
+  0.15x their average height). Use `--pair-mode off` to disable this and
+  always use a single box around everything detected, or `--pair-mode on`
+  to force the pair layout whenever 2+ items are found.
 - **No item detected:** falls back to a plain center crop of the full image
   and flags that file in the console output so you can check it manually.
 
-Because the pair layout repositions the pieces onto a flat background fill
-sampled from the photo, it works best on plain/solid backdrops — a subtle
-gradient or shadow in the original background won't carry over around the
-moved pieces.
+The pair layout reuses the original photo's own background (erasing the
+items' old spots and re-pasting them at their new positions), so it works
+best on plain/solid backdrops — a subtle gradient or shadow in the original
+background won't perfectly follow the moved pieces.
 
 Run with `--debug` first on a sample folder to confirm detection looks
 right before processing your full catalog — it saves a `*.debug.jpg` next
