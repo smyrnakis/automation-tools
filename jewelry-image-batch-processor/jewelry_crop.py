@@ -189,8 +189,14 @@ def build_pair_canvas(img, bg_color, left_comp, right_comp, gap_ratio, vertical_
     gap = max(gap, original_gap)
     gap = max(0, min(gap, max(base_side - lw - rw, original_gap)))
 
+    # Same floor rule: never make the height difference smaller than it was
+    # in the original photo (measured between vertical centers of the two items).
+    left_cy = (left_comp["bbox"][1] + left_comp["bbox"][3]) / 2
+    right_cy = (right_comp["bbox"][1] + right_comp["bbox"][3]) / 2
+    original_vertical_offset = max(0, int(left_cy - right_cy))
     vertical_offset = int(round(((lh + rh) / 2) * vertical_offset_ratio))
-    vertical_offset = max(0, min(vertical_offset, base_side - max(lh, rh)))
+    vertical_offset = max(vertical_offset, original_vertical_offset)
+    vertical_offset = max(0, min(vertical_offset, max(base_side - max(lh, rh), original_vertical_offset)))
 
     # Right piece sits `vertical_offset` px higher than the left piece.
     left_pos = (0, vertical_offset)
