@@ -181,8 +181,13 @@ def build_pair_canvas(img, bg_color, left_comp, right_comp, gap_ratio, vertical_
     lw, lh = left_img.size
     rw, rh = right_img.size
 
+    # Never bring the items closer together than they already were in the
+    # original photo - only ever spread them further apart. The canvas is
+    # allowed to grow past base_side (see below) to honor this floor.
+    original_gap = max(0, right_comp["bbox"][0] - left_comp["bbox"][2])
     gap = int(round(((lw + rw) / 2) * gap_ratio))
-    gap = max(0, min(gap, base_side - lw - rw))
+    gap = max(gap, original_gap)
+    gap = max(0, min(gap, max(base_side - lw - rw, original_gap)))
 
     vertical_offset = int(round(((lh + rh) / 2) * vertical_offset_ratio))
     vertical_offset = max(0, min(vertical_offset, base_side - max(lh, rh)))

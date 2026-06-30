@@ -65,8 +65,10 @@ product shots) and finds connected blobs that differ from that background.
   is sized to match the original photo's own scale (`min(width, height)`),
   so the pieces only move within the frame — they're never zoomed in or
   enlarged relative to the canvas. (`--padding` has no effect in this mode,
-  since there's no tight crop to pad.) Tune the layout with `--pair-gap`
-  (space between pieces, default 0.6x their average width) and
+  since there's no tight crop to pad.) The gap between pieces is only ever
+  increased, never reduced below their original spacing in the photo, so
+  they're never pushed closer together than they started. Tune the layout
+  with `--pair-gap` (space between pieces, default 0.6x their average width) and
   `--pair-vertical-offset` (how much higher the right piece sits, default
   0.15x their average height). Use `--pair-mode off` to disable this and
   always use a single box around everything detected, or `--pair-mode on`
