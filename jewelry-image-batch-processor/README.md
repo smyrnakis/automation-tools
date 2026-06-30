@@ -39,11 +39,12 @@ This creates `C:\Users\you\Pictures\NewArrivals\processed\` containing one
 
 ### Useful options
 ```
-py jewelry_crop.py "C:\path\to\photos" --quality 90        # change compression quality (0-100, default 85)
-py jewelry_crop.py "C:\path\to\photos" --recursive         # also process photos in subfolders
-py jewelry_crop.py "C:\path\to\photos" --debug              # also save a copy showing the detected crop box, so you can sanity-check it
-py jewelry_crop.py "C:\path\to\photos" --threshold 20      # lower this if a faint/light item isn't being detected
-py jewelry_crop.py "C:\path\to\photos" --no-crop            # skip cropping, just convert/compress to WebP as-is
+py jewelry_crop.py "C:\path\to\photos" --quality 90               # change compression quality (0-100, default 85)
+py jewelry_crop.py "C:\path\to\photos" --recursive                # also process photos in subfolders
+py jewelry_crop.py "C:\path\to\photos" --debug                     # also save a copy showing the detected box(es), so you can sanity-check it
+py jewelry_crop.py "C:\path\to\photos" --threshold 20             # lower this if a faint/light item isn't being detected
+py jewelry_crop.py "C:\path\to\photos" --no-crop                   # skip cropping, just convert/compress to WebP as-is
+py jewelry_crop.py "C:\path\to\photos" --pair-mode off            # always use a single bounding-box crop, never the two-piece layout
 ```
 
 Already-processed files are skipped on rerun, so it's safe to drop new
@@ -53,13 +54,28 @@ photos into the same folder and run it again.
 
 The script samples the border of each photo to estimate the background
 color (works best with a plain/solid backdrop, which is typical for jewelry
-product shots), finds the bounding box of whatever differs from that
-background, and centers the square crop on that bounding box with a 15%
-margin. If no item can be confidently detected, it falls back to a plain
-center crop of the full image and flags that file in the console output so
-you can check it manually.
+product shots) and finds connected blobs that differ from that background.
+
+- **One item detected:** centers the square crop on its bounding box with a
+  15% margin (`--padding` to change it).
+- **Two similarly-sized items detected** (e.g. a pair of earrings):
+  automatically switches to a **pair layout** — it cuts out each piece
+  (without resizing either one), spaces them apart, places the right piece
+  higher than the left, and centers the pair as a whole in the square frame.
+  Tune this with `--pair-gap` (space between pieces, default 0.6x their
+  average width) and `--pair-vertical-offset` (how much higher the right
+  piece sits, default 0.15x their average height). Use `--pair-mode off` to
+  disable this and always use a single box around everything detected, or
+  `--pair-mode on` to force the pair layout whenever 2+ items are found.
+- **No item detected:** falls back to a plain center crop of the full image
+  and flags that file in the console output so you can check it manually.
+
+Because the pair layout repositions the pieces onto a flat background fill
+sampled from the photo, it works best on plain/solid backdrops — a subtle
+gradient or shadow in the original background won't carry over around the
+moved pieces.
 
 Run with `--debug` first on a sample folder to confirm detection looks
 right before processing your full catalog — it saves a `*.debug.jpg` next
-to each output with the detected item (green box) and final crop (red box)
-drawn on it.
+to each output with the detected item box(es) in green (and, for single-item
+crops, the final crop box in red).
