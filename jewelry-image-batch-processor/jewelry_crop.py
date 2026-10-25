@@ -26,10 +26,34 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 from scipy import ndimage
 
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+
+
+def load_image(src_path: Path):
+    """Open an image upright (honoring the EXIF orientation tag phones write),
+    flattened to RGB (transparent PNG areas become white, not black).
+
+    Returns (image, icc_profile_bytes_or_None).
+    """
+    with Image.open(src_path) as raw:
+        icc_profile = raw.info.get("icc_profile")
+        img = ImageOps.exif_transpose(raw)
+        if img.mode in ("RGBA", "LA", "P"):
+            rgba = img.convert("RGBA")
+            flat = Image.new("RGB", rgba.size, (255, 255, 255))
+            flat.paste(rgba, mask=rgba.getchannel("A"))
+            return flat, icc_profile
+        return img.convert("RGB"), icc_profile
+
+
+def save_webp(img: Image.Image, dst_path: Path, quality: int, icc_profile) -> None:
+    """Save as WebP, keeping the source color profile so colors don't shift
+    (important for gold/gemstone tones on wide-gamut phone photos)."""
+    extra = {"icc_profile": icc_profile} if icc_profile else {}
+    img.save(dst_path, "WEBP", quality=quality, method=6, **extra)
 
 
 def estimate_background_color(rgb: np.ndarray, border_px: int = 10) -> np.ndarray:
@@ -267,65 +291,66 @@ def process_image(
     pair_size_ratio: float,
 ) -> str:
     """Process a single image. Returns a short status string."""
-    with Image.open(src_path) as img:
-        img = img.convert("RGB")
+    img, icc_profile = load_image(src_path)
 
-        if not crop:
-            img.save(dst_path, "WEBP", quality=quality)
-            return "ok"
+    if not crop:
+        save_webp(img, dst_path, quality, icc_profile)
+        return "ok"
 
-        rgb = np.array(img)
-        bg_color = estimate_background_color(rgb)
-        components = find_components(rgb, bg_color, threshold)
+    rgb = np.array(img)
+    bg_color = estimate_background_color(rgb)
+    components = find_components(rgb, bg_color, threshold)
 
-        pair = None
-        if pair_mode != "off" and len(components) >= 2:
-            pair = detect_pair(components, pair_size_ratio)
-            if pair is None and pair_mode == "on":
-                pair = (components[0], components[1])
+    pair = None
+    if pair_mode != "off" and len(components) >= 2:
+        pair = detect_pair(components, pair_size_ratio)
+        if pair is None and pair_mode == "on":
+            pair = (components[0], components[1])
 
-        if pair is not None:
-            left_comp, right_comp = order_left_right(*pair)
-            canvas, debug_boxes = build_pair_canvas(
-                img, bg_color, left_comp, right_comp, pair_gap_ratio, pair_vertical_offset_ratio
-            )
-            canvas.save(dst_path, "WEBP", quality=quality)
-
-            if debug:
-                debug_img = canvas.copy()
-                draw = ImageDraw.Draw(debug_img)
-                for box in debug_boxes:
-                    draw.rectangle(box, outline=(0, 255, 0), width=max(2, canvas.width // 300))
-                debug_path = dst_path.with_name(dst_path.stem + ".debug.jpg")
-                debug_img.save(debug_path, "JPEG", quality=90)
-
-            return "ok (pair layout)"
-
-        bbox = union_bbox(components)
-        crop_box = compute_square_crop(img.size, bbox, padding_ratio)
-
-        status = "ok"
-        if bbox is None:
-            status = "fallback (no item detected, used full-image center crop)"
-
-        cropped = img.crop(crop_box)
-        cropped.save(dst_path, "WEBP", quality=quality)
+    if pair is not None:
+        left_comp, right_comp = order_left_right(*pair)
+        canvas, debug_boxes = build_pair_canvas(
+            img, bg_color, left_comp, right_comp, pair_gap_ratio, pair_vertical_offset_ratio
+        )
+        save_webp(canvas, dst_path, quality, icc_profile)
 
         if debug:
-            debug_img = img.copy()
+            debug_img = canvas.copy()
             draw = ImageDraw.Draw(debug_img)
-            draw.rectangle(crop_box, outline=(255, 0, 0), width=max(2, img.width // 300))
-            if bbox:
-                draw.rectangle(bbox, outline=(0, 255, 0), width=max(2, img.width // 300))
+            for box in debug_boxes:
+                draw.rectangle(box, outline=(0, 255, 0), width=max(2, canvas.width // 300))
             debug_path = dst_path.with_name(dst_path.stem + ".debug.jpg")
             debug_img.save(debug_path, "JPEG", quality=90)
 
-        return status
+        return "ok (pair layout)"
+
+    bbox = union_bbox(components)
+    crop_box = compute_square_crop(img.size, bbox, padding_ratio)
+
+    status = "ok"
+    if bbox is None:
+        status = "fallback (no item detected, used full-image center crop)"
+
+    cropped = img.crop(crop_box)
+    save_webp(cropped, dst_path, quality, icc_profile)
+
+    if debug:
+        debug_img = img.copy()
+        draw = ImageDraw.Draw(debug_img)
+        draw.rectangle(crop_box, outline=(255, 0, 0), width=max(2, img.width // 300))
+        if bbox:
+            draw.rectangle(bbox, outline=(0, 255, 0), width=max(2, img.width // 300))
+        debug_path = dst_path.with_name(dst_path.stem + ".debug.jpg")
+        debug_img.save(debug_path, "JPEG", quality=90)
+
+    return status
 
 
-def collect_images(input_dir: Path, recursive: bool):
+def collect_images(input_dir: Path, recursive: bool, output_dir: Path):
     pattern = "**/*" if recursive else "*"
     for path in sorted(input_dir.glob(pattern)):
+        if output_dir in path.parents:
+            continue  # never re-process our own output (or its .debug.jpg files)
         if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
             yield path
 
@@ -415,7 +440,7 @@ def main():
     output_dir = Path(args.output_dir).expanduser().resolve() if args.output_dir else input_dir / "processed"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    images = list(collect_images(input_dir, args.recursive))
+    images = list(collect_images(input_dir, args.recursive, output_dir))
     if not images:
         print(f"No .jpg/.jpeg/.png files found in '{input_dir}'.")
         return

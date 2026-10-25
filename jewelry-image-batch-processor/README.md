@@ -47,6 +47,11 @@ py jewelry_crop.py "C:\path\to\photos" --no-crop                   # skip croppi
 py jewelry_crop.py "C:\path\to\photos" --pair-mode off            # always use a single bounding-box crop, never the two-piece layout
 ```
 
+Phone photos are auto-rotated upright (EXIF orientation), transparent PNGs are
+flattened onto white, and the source color profile is embedded in the WebP so
+gold/stone tones don't shift. With `--recursive`, the output folder is never
+re-scanned.
+
 Already-processed files are skipped on rerun, so it's safe to drop new
 photos into the same folder and run it again.
 
