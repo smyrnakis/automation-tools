@@ -1,92 +1,62 @@
 # Jewelry Image Batch Processor
 
-Batch-crops jewelry product photos to a centered 1:1 square (auto-detecting
-the item against its background) and saves them as compressed WebP images
-at 85% quality.
+Crops jewelry photos to a centered 1:1 square and saves them as WebP (85% quality).
+Originals are never touched; results go to a `processed` subfolder.
 
-**Originals are never modified or deleted.** Output is written to a
-`processed` subfolder created inside the folder you point it at.
+## Setup (once, Windows)
 
-## Setup (one-time, Windows)
-
-1. Install Python from https://python.org if you don't already have it.
-   During install, check "Add python.exe to PATH".
-2. Download/copy this `jewelry-image-batch-processor` folder onto your laptop.
-3. Open a terminal (PowerShell or Command Prompt) in that folder and run:
+1. Install [Python](https://python.org) (tick "Add python.exe to PATH").
+2. In this folder, run:
    ```
    py -m pip install -r requirements.txt
    ```
 
 ## Usage
 
-There are two modes:
-- **Crop + convert** — crops to a centered 1:1 square, then saves as WebP.
-- **Convert only** — skips cropping entirely, just re-saves as WebP at the
-  given quality (keeps the original aspect ratio).
+**Drag and drop**
 
-### Option A: drag and drop
-- Crop + convert: drag the folder containing your photos onto `process_photos.bat`.
-- Convert only (no crop): drag the folder onto `convert_only.bat`.
+| Drag your photo folder onto... | Result |
+|---|---|
+| `process_photos.bat` | crop to 1:1 + convert to WebP |
+| `convert_only.bat` | convert to WebP only, no crop |
 
-### Option B: command line
+**Command line**
 ```
-py jewelry_crop.py "C:\Users\you\Pictures\NewArrivals"             REM crop + convert
-py jewelry_crop.py "C:\Users\you\Pictures\NewArrivals" --no-crop   REM convert only, no crop
+py jewelry_crop.py "C:\Photos\NewArrivals"              # crop + convert
+py jewelry_crop.py "C:\Photos\NewArrivals" --no-crop    # convert only
 ```
 
-This creates `C:\Users\you\Pictures\NewArrivals\processed\` containing one
-`.webp` file per source `.jpg`/`.jpeg`/`.png` photo.
+Input: `.jpg`, `.jpeg`, `.png`. Output: `C:\Photos\NewArrivals\processed\*.webp`.
+Re-running skips files that are already processed.
 
-### Useful options
+## Options
+
 ```
-py jewelry_crop.py "C:\path\to\photos" --quality 90               # change compression quality (0-100, default 85)
-py jewelry_crop.py "C:\path\to\photos" --recursive                # also process photos in subfolders
-py jewelry_crop.py "C:\path\to\photos" --debug                     # also save a copy showing the detected box(es), so you can sanity-check it
-py jewelry_crop.py "C:\path\to\photos" --threshold 20             # lower this if a faint/light item isn't being detected
-py jewelry_crop.py "C:\path\to\photos" --no-crop                   # skip cropping, just convert/compress to WebP as-is
-py jewelry_crop.py "C:\path\to\photos" --pair-mode off            # always use a single bounding-box crop, never the two-piece layout
+--quality 90            WebP quality, 0-100 (default 85)
+--recursive             include subfolders
+--output-dir "D:\out"   save somewhere other than <folder>\processed
+--debug                 also save a *.debug.jpg showing what was detected
+--threshold 20          lower it if a pale item isn't detected (default 30)
+--padding 0.2           margin around the item (default 0.15)
+--no-crop               skip cropping, only convert
 ```
 
-Phone photos are auto-rotated upright (EXIF orientation), transparent PNGs are
-flattened onto white, and the source color profile is embedded in the WebP so
-gold/stone tones don't shift. With `--recursive`, the output folder is never
-re-scanned.
+## Pairs (e.g. earrings)
 
-Already-processed files are skipped on rerun, so it's safe to drop new
-photos into the same folder and run it again.
+If two similar-sized items are found, they are spread apart, the right one is
+placed higher, and the pair is centered. Neither piece is resized.
 
-## How "centering" works
+```
+--pair-mode off             never use the pair layout
+--pair-mode on              force it whenever 2+ items are found
+--pair-gap 0.8              gap between pieces (default 0.6 x avg width)
+--pair-vertical-offset 0.2  right piece height offset (default 0.15 x avg height)
+```
 
-The script samples the border of each photo to estimate the background
-color (works best with a plain/solid backdrop, which is typical for jewelry
-product shots) and finds connected blobs that differ from that background.
+## Tips
 
-- **One item detected:** centers the square crop on its bounding box with a
-  15% margin (`--padding` to change it).
-- **Two similarly-sized items detected** (e.g. a pair of earrings):
-  automatically switches to a **pair layout** — it cuts out each piece
-  (without resizing either one), spaces them apart, places the right piece
-  higher than the left, and centers the pair as a whole. The output square
-  is sized to match the original photo's own scale (`min(width, height)`),
-  so the pieces only move within the frame — they're never zoomed in or
-  enlarged relative to the canvas. (`--padding` has no effect in this mode,
-  since there's no tight crop to pad.) The gap between pieces is only ever
-  increased, never reduced below their original spacing in the photo, so
-  they're never pushed closer together than they started. Tune the layout
-  with `--pair-gap` (space between pieces, default 0.6x their average width) and
-  `--pair-vertical-offset` (how much higher the right piece sits, default
-  0.15x their average height). Use `--pair-mode off` to disable this and
-  always use a single box around everything detected, or `--pair-mode on`
-  to force the pair layout whenever 2+ items are found.
-- **No item detected:** falls back to a plain center crop of the full image
-  and flags that file in the console output so you can check it manually.
-
-The pair layout reuses the original photo's own background (erasing the
-items' old spots and re-pasting them at their new positions), so it works
-best on plain/solid backdrops — a subtle gradient or shadow in the original
-background won't perfectly follow the moved pieces.
-
-Run with `--debug` first on a sample folder to confirm detection looks
-right before processing your full catalog — it saves a `*.debug.jpg` next
-to each output with the detected item box(es) in green (and, for single-item
-crops, the final crop box in red).
+- Works best on plain, solid backgrounds.
+- Try `--debug` on a few photos first to check the detection.
+- If no item is found, the photo is center-cropped and flagged in the console.
+- Phone photos are auto-rotated upright, transparent PNGs go onto white, and the
+  photo's color profile is kept in the WebP so gold/stone tones don't shift.
