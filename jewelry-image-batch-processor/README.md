@@ -58,3 +58,5 @@ placed higher, and the pair is centered. Neither piece is resized.
 - Works best on plain, solid backgrounds.
 - Try `--debug` on a few photos first to check the detection.
 - If no item is found, the photo is center-cropped and flagged in the console.
+- Phone photos are auto-rotated upright, transparent PNGs go onto white, and the
+  photo's color profile is kept in the WebP so gold/stone tones don't shift.
