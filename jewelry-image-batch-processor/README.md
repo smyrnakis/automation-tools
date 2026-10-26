@@ -1,6 +1,6 @@
 # Jewelry Image Batch Processor
 
-Crops jewelry photos to a centered 1:1 square and saves them as WebP (85% quality).
+Crops jewelry photos to a centered 1:1 square and saves them as WebP (90% quality).
 Originals are never touched; results go to a `processed` subfolder.
 
 ## Setup (once, Windows)
@@ -32,7 +32,7 @@ Re-running skips files that are already processed.
 ## Options
 
 ```
---quality 90            WebP quality, 0-100 (default 85)
+--quality 80            WebP quality, 0-100 (default 90)
 --recursive             include subfolders
 --output-dir "D:\out"   save somewhere other than <folder>\processed
 --debug                 also save a *.debug.jpg showing what was detected

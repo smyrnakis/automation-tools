@@ -12,7 +12,7 @@ in the square frame.
 
 Usage:
     python jewelry_crop.py "C:\\path\\to\\photos"
-    python jewelry_crop.py "C:\\path\\to\\photos" --quality 90 --recursive
+    python jewelry_crop.py "C:\\path\\to\\photos" --quality 80 --recursive
     python jewelry_crop.py "C:\\path\\to\\photos" --debug
     python jewelry_crop.py "C:\\path\\to\\photos" --no-crop
     python jewelry_crop.py "C:\\path\\to\\photos" --pair-mode off
@@ -361,7 +361,7 @@ def main():
     )
     parser.add_argument("input_dir", help="Folder containing the photos to process")
     parser.add_argument(
-        "--quality", type=int, default=85, help="WebP quality, 0-100 (default: 85)"
+        "--quality", type=int, default=90, help="WebP quality, 0-100 (default: 90)"
     )
     parser.add_argument(
         "--padding",
